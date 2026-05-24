@@ -1,23 +1,6 @@
 # 🍔 Mateus Hamburgueria
 
-App Flutter desenvolvido para a Situação de Aprendizagem 2 (SA2) do curso Técnico em Desenvolvimento de Sistemas - SENAI.
 
-## 📋 Requisitos Atendidos
-
-### Capacidades Técnicas
-- ✅ **C6**: Implementar código respeitando características da linguagem Dart
-- ✅ **C7**: Persistir dados em dispositivos móveis (SharedPreferences)
-- ✅ **C8**: Integração com serviços web RESTful (GET, POST, PUT, DELETE)
-- ✅ **C11**: Programação Orientada a Objetos (classes, herança, encapsulamento)
-
-### Conhecimentos
-- ✅ Interface com leiaute, componentes, menus e diálogos
-- ✅ Manipulação de listas na interface
-- ✅ Navegação entre telas com passagem de parâmetros
-- ✅ Tratamento de eventos e exceções
-- ✅ Persistência de dados local (SharedPreferences)
-- ✅ Consumo de RESTful Web Service (JSON Server)
-- ✅ Requisições assíncronas (async/await, Future)
 
 ## 🚀 Como Executar
 
