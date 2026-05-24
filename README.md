@@ -49,5 +49,9 @@ lib/
 - **Histórico**: Visualizar pedidos do servidor e local
 - **CRUD Completo**: Criar, ler, atualizar e excluir pedidos
 
+##Autor
+
+##Mateus Ferreira Salustiano
+
 ## 👨‍💻 Autor
 Desenvolvido por Mateus para a disciplina PPDM - SENAI Roberto Mange.
