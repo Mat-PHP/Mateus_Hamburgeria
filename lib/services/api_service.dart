@@ -1,30 +1,31 @@
-import 'dart:convert';
-import 'dart:async';
-import 'package:http/http.dart' as http;
-// CORREÇÃO DO ERRO AQUI: Este import conecta o serviço ao arquivo que você já criou
-import '../models/burger.dart';
+import 'dart:convert'; // Necessário para converter JSON (decodificar/codificar)
+import 'dart:async';   // Necessário para lidar com operações assíncronas (Future)
+import 'package:http/http.dart' as http; // Biblioteca para requisições HTTP
+import '../models/burger.dart'; // Import do seu modelo de dados
 
-/// Serviço de API - Integração com RESTful Web Service
-/// Implementa GET, POST, PUT, DELETE utilizando Orientação a Objetos
+/// Serviço de API - Gerencia a comunicação do App com o servidor (json-server)
 class ApiService {
-  static const String baseUrl = 'http://192.168.0.195:30';
+  // A URL base deve apontar para o IP da sua máquina e a PORTA correta.
+  // IMPORTANTE: Altere de 300 para 3000 para coincidir com o servidor.
+  static const String baseUrl = 'http://10.109.72.26:300';
 
+  // Cliente HTTP reutilizável para manter a conexão ativa
   final http.Client _client = http.Client();
 
-  // ==================== BURGERS ====================
+  // ==================== BURGERS (Operações CRUD) ====================
 
-  /// GET - Lista todos os hambúrgueres (C17 - 6.1.1 GET)
+  /// GET: Busca todos os hambúrgueres cadastrados no db.json
   Future<List<Burger>> getBurgers() async {
     final response = await _client.get(Uri.parse('$baseUrl/burgers'));
     if (response.statusCode == 200) {
       final List<dynamic> decodedList = json.decode(response.body);
-      // Converte a lista de mapas do json-server em objetos do tipo Burger
+      // Transforma a lista de mapas em objetos do tipo Burger
       return decodedList.map((item) => Burger.fromJson(item)).toList();
     }
     throw Exception('Falha ao carregar hambúrgueres: ${response.statusCode}');
   }
 
-  /// GET by ID - Busca hambúrguer específico
+  /// GET by ID: Busca apenas um hambúrguer pelo seu ID
   Future<Burger> getBurgerById(int id) async {
     final response = await _client.get(Uri.parse('$baseUrl/burgers/$id'));
     if (response.statusCode == 200) {
@@ -33,20 +34,20 @@ class ApiService {
     throw Exception('Hambúrguer não encontrado: ${response.statusCode}');
   }
 
-  /// POST - Cria novo hambúrguer (C17 - 6.1.2 POST)
+  /// POST: Envia um novo hambúrguer para ser salvo no db.json
   Future<Burger> createBurger(Burger burger) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/burgers'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(burger.toJson()),
     );
-    if (response.statusCode == 201) {
+    if (response.statusCode == 201) { // 201 significa "Criado com sucesso"
       return Burger.fromJson(json.decode(response.body));
     }
     throw Exception('Falha ao criar hambúrguer: ${response.statusCode}');
   }
 
-  /// PUT - Atualiza hambúrguer (C17 - 6.1.3 PUT)
+  /// PUT: Atualiza um hambúrguer existente via ID
   Future<Burger> updateBurger(int id, Burger burger) async {
     final response = await _client.put(
       Uri.parse('$baseUrl/burgers/$id'),
@@ -59,7 +60,7 @@ class ApiService {
     throw Exception('Falha ao atualizar hambúrguer: ${response.statusCode}');
   }
 
-  /// DELETE - Remove hambúrguer (C17 - 6.1.4 DELETE)
+  /// DELETE: Remove um hambúrguer do db.json
   Future<void> deleteBurger(int id) async {
     final response = await _client.delete(Uri.parse('$baseUrl/burgers/$id'));
     if (response.statusCode != 200 && response.statusCode != 204) {
@@ -69,7 +70,7 @@ class ApiService {
 
   // ==================== USUÁRIOS ====================
 
-  /// GET - Lista usuários
+  /// GET: Lista todos os usuários
   Future<List<dynamic>> getUsers() async {
     final response = await _client.get(Uri.parse('$baseUrl/usuarios'));
     if (response.statusCode == 200) {
@@ -78,7 +79,7 @@ class ApiService {
     throw Exception('Falha ao carregar usuários: ${response.statusCode}');
   }
 
-  /// POST - Login com email e senha
+  /// Lógica de Autenticação: Busca usuário por e-mail e verifica a senha
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _client.get(
       Uri.parse('$baseUrl/usuarios?email=$email'),
@@ -92,20 +93,20 @@ class ApiService {
       if (user['senha'] != password) {
         throw Exception('Senha incorreta');
       }
-      return user;
+      return user; // Retorna os dados do usuário logado
     }
     throw Exception('Erro ao conectar com servidor');
   }
 
-  // ==================== PEDIDOS (telalocal) ====================
+  // ==================== PEDIDOS ====================
 
-  /// Helper de retry com laço 'while' explícito
+  /// Função auxiliar com tentativa de reconexão (Retry) em caso de falha de rede
   Future<http.Response> _getWithRetry(Uri url, {int maxAttempts = 3}) async {
     int attempt = 0;
     while (attempt < maxAttempts) {
       try {
         final r = await _client.get(url);
-        if (r.statusCode < 500) return r;
+        if (r.statusCode < 500) return r; // Sucesso ou erro do cliente
       } catch (_) {}
       attempt++;
       await Future.delayed(Duration(milliseconds: 300 * attempt));
@@ -113,19 +114,19 @@ class ApiService {
     throw Exception('Falha após $maxAttempts tentativas');
   }
 
-  /// GET - Lista pedidos (usa retry com while)
+  /// GET: Busca a lista de pedidos salvos
   Future<List<dynamic>> getOrders() async {
-    final response = await _getWithRetry(Uri.parse('$baseUrl/telalocal'));
+    final response = await _getWithRetry(Uri.parse('$baseUrl/pedidos'));
     if (response.statusCode == 200) {
       return json.decode(response.body);
     }
     throw Exception('Falha ao carregar pedidos: ${response.statusCode}');
   }
 
-  /// POST - Cria novo pedido
+  /// POST: Salva um novo pedido no servidor
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/telalocal'),
+      Uri.parse('$baseUrl/pedidos'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(data),
     );
@@ -135,11 +136,10 @@ class ApiService {
     throw Exception('Falha ao criar pedido: ${response.statusCode}');
   }
 
-  /// PUT - Atualiza pedido
-  Future<Map<String, dynamic>> updateOrder(
-      int id, Map<String, dynamic> data) async {
+  /// PUT: Atualiza o status de um pedido existente
+  Future<Map<String, dynamic>> updateOrder(int id, Map<String, dynamic> data) async {
     final response = await _client.put(
-      Uri.parse('$baseUrl/telalocal/$id'),
+      Uri.parse('$baseUrl/pedidos/$id'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(data),
     );
@@ -149,14 +149,15 @@ class ApiService {
     throw Exception('Falha ao atualizar pedido: ${response.statusCode}');
   }
 
-  /// DELETE - Remove pedido
+  /// DELETE: Remove um pedido do db.json
   Future<void> deleteOrder(int id) async {
-    final response = await _client.delete(Uri.parse('$baseUrl/telalocal/$id'));
+    final response = await _client.delete(Uri.parse('$baseUrl/pedidos/$id'));
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception('Falha ao deletar pedido: ${response.statusCode}');
     }
   }
 
+  /// Fecha o cliente HTTP para liberar recursos da memória
   void dispose() {
     _client.close();
   }

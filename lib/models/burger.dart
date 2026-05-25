@@ -17,27 +17,21 @@ class Burger {
     required this.imageUrl,
   });
 
+  // Converte de JSON para o Objeto Burger (Usado no GET)
   factory Burger.fromJson(Map<String, dynamic> json) {
     return Burger(
-      // Evita o erro convertendo para int de forma segura
-      id: json['id'] is int 
-          ? json['id'] 
-          : int.parse(json['id'].toString()),
-          
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      
-      // Evita erros se o preço vier como int ou String
-      price: json['price'] is num 
-          ? (json['price'] as num).toDouble() 
-          : double.parse((json['price'] ?? 0).toString()),
-          
-      category: json['category'] ?? '',
-      isAvailable: json['isAvailable'] ?? true,
-      imageUrl: json['imageUrl'] ?? '',
+      id: json['id'],
+      name: json['name'],
+      description: json['description'],
+      price: (json['price'] as num).toDouble(),
+      category: json['category'],
+      isAvailable: json['isAvailable'],
+      imageUrl: json['imageUrl'],
     );
   }
 
+  // Converte o Objeto Burger para JSON (Usado no POST e PUT)
+  // ESTE É O MÉTODO QUE ESTAVA FALTANDO
   Map<String, dynamic> toJson() {
     return {
       'id': id,

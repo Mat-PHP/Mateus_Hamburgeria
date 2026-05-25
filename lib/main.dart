@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
-import 'screens/home_page.dart'; // Certifique-se que o caminho está correto
+import 'services/local_storage_service.dart';
+import 'screens/login_page.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  // Garante a inicialização dos bindings do Flutter
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa o SharedPreferences antes do app renderizar a tela
+  await LocalStorageService.init();
+
+  runApp(const MateusHamburgueriaApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MateusHamburgueriaApp extends StatelessWidget {
+  const MateusHamburgueriaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Mateus Hamburgueria',
       debugShowCheckedModeBanner: false,
-      home: const HomePage(),
+      theme: ThemeData(
+        primarySwatch: Colors.amber,
+        useMaterial3: true,
+      ),
+      home: const LoginPage(),
     );
   }
 }

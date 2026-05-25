@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
 import 'payment_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -10,102 +9,197 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final ApiService _apiService = ApiService();
-  late Future<List<dynamic>> _futureBurgers;
+  double totalPedido = 59.90;
+  bool itemRemovido = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _futureBurgers = _apiService.getBurgers();
+  Future<void> _irParaPagamento() async {
+    if (itemRemovido) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seu carrinho está vazio!')),
+      );
+      return;
+    }
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        // CORREÇÃO: Removido o parâmetro 'total' que causava o erro
+        builder: (context) => const PaymentPage(),
+      ),
+    );
+  }
+
+  void _excluirPedido() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Excluir pedido'),
+          content: const Text('Deseja remover este item do carrinho?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+
+                setState(() {
+                  itemRemovido = true;
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item removido do carrinho!')),
+                );
+              },
+              child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mateus Hamburgueria'),
-        backgroundColor: Colors.amber,
-        centerTitle: true,
+        title: const Text('Mateus Hamburger'),
+        backgroundColor: Colors.orange,
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: _futureBurgers,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.amber),
-            );
-          }
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: itemRemovido
+            ? const Center(
+                child: Text(
+                  'Carrinho vazio',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seu Pedido',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 20),
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Erro: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Nenhum hambúrguer encontrado.'));
-          }
-
-          final lista = snapshot.data!;
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: lista.length,
-            itemBuilder: (context, index) {
-              final item = Map<String, dynamic>.from(lista[index]);
-
-              final String nome = (item['name'] ?? item['nome'] ?? 'Hambúrguer').toString();
-              final String descricao = (item['description'] ?? item['descricao'] ?? '').toString();
-              final String imagem = (item['imageUrl'] ?? item['imagemUrl'] ?? '').toString();
-              
-              final int id = item['id'] is int ? item['id'] : int.tryParse(item['id'].toString()) ?? 0;
-              final double preco = item['price'] is num ? (item['price'] as num).toDouble() : double.tryParse(item['price'].toString()) ?? 0.0;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16.0),
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(12.0),
-                  // CORREÇÃO AQUI: Usa a variável 'imagem' para carregar a foto real da API
-                  leading: imagem.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            imagem,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.fastfood, size: 50, color: Colors.grey),
+                  Card(
+                    elevation: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.lunch_dining,
+                              size: 50,
+                              color: Colors.orange,
+                            ),
                           ),
-                        )
-                      : const Icon(Icons.fastfood, size: 50, color: Colors.grey),
-                  title: Text(nome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(width: 16),
+
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'X-Bacon Especial',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: _excluirPedido,
+                                      icon: const Icon(Icons.delete,
+                                          color: Colors.red),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Hambúrguer artesanal com bacon e cheddar.',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'R\$ ${totalPedido.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(height: 4),
-                      Text(descricao),
-                      const SizedBox(height: 8),
-                      Text('R\$ ${preco.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const Text(
+                        'Total',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'R\$ ${totalPedido.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green),
+                      ),
                     ],
                   ),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PaymentPage(id: id, name: nome, price: preco),
+
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _irParaPagamento,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      );
-                    },
-                    child: const Text('Pedir'),
+                      ),
+                      child: const Text(
+                        'Ir para pagamento',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                    ),
                   ),
-                ),
-              );
-            },
-          );
-        },
+                ],
+              ),
       ),
     );
   }
