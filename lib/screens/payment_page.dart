@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import '../models/burger.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 
-/// Tela de Pagamento - CRUD completo com RESTful
+const _pixCode = '00020126360014BR.GOV.BCB.PIX0114+5511999999999520400005303986'
+    '540510.005802BR5913HAMBURGUERIA6009SAO PAULO62070503***6304ABCD';
+
 class PaymentPage extends StatefulWidget {
-  final List<Burger> cart;
-  final double total;
+  // CONFIGURAÇÃO DOS PARÂMETROS OBRIGATÓRIOS
+  final int id;
+  final String name;
+  final double price;
 
   const PaymentPage({
     super.key,
-    required this.cart,
-    required this.total,
+    required this.id,
+    required this.name,
+    required this.price,
   });
 
   @override
@@ -20,408 +25,440 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  final _apiService = ApiService();
-  List<dynamic> _orders = [];
-  bool _isProcessing = false;
-  Timer? _refreshTimer;
+  int quantidade = 1;
+  String? _metodoPagamento;
+  bool _enviando = false;
+  final ApiService _apiService = ApiService();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadOrders();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 3),
-      (_) => _loadOrders(),
-    );
-  }
+  final _cardNumberController = TextEditingController();
+  final _cardNameController = TextEditingController();
+  final _cardExpiryController = TextEditingController();
+  final _cardCvvController = TextEditingController();
+  final _trocoController = TextEditingController();
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _cardNumberController.dispose();
+    _cardNameController.dispose();
+    _cardExpiryController.dispose();
+    _cardCvvController.dispose();
+    _trocoController.dispose();
     _apiService.dispose();
     super.dispose();
   }
 
-  Future<void> _loadOrders() async {
-    try {
-      final data = await _apiService.getOrders();
-      if (mounted) {
-        setState(() => _orders = data);
-      }
-    } catch (e) {
-      debugPrint('Erro ao carregar pedidos: $e');
-    }
-  }
-
-  Future<void> _finalizePayment() async {
-    if (widget.cart.isEmpty) {
-      _showMessage('Carrinho vazio!', Colors.orange);
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      final orderData = {
-        'title': 'Pedido #${DateTime.now().millisecondsSinceEpoch.toString().substring(5, 13)}',
-        'status': 'ativo',
-        'description':
-            'Total: R\$ ${widget.total.toStringAsFixed(2)} - Itens: ${widget.cart.map((b) => b.name).join(", ")}',
-        'items': widget.cart.map((b) => b.toJson()).toList(),
-        'total': widget.total,
-        'createdAt': DateTime.now().toIso8601String(),
-      };
-
-      await _apiService.createOrder(orderData);
-      await LocalStorageService.saveLocalOrder(orderData);
-      await LocalStorageService.clearCart();
-
-      if (!mounted) return;
-      _showMessage('Pedido realizado com sucesso!', Colors.green);
-      _showSuccessDialog();
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage('Erro: $e', Colors.red);
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _updateOrder(dynamic id, String newStatus) async {
-    try {
-      final order = _orders.firstWhere((o) => o['id'] == id);
-      final updatedData = {
-        'title': order['title'],
-        'status': newStatus,
-        'description': order['description'],
-      };
-
-      await _apiService.updateOrder(id, updatedData);
-      _showMessage('Pedido atualizado!', Colors.blue);
-      _loadOrders();
-    } catch (e) {
-      _showMessage('Erro ao atualizar: $e', Colors.red);
-    }
-  }
-
-  Future<void> _deleteOrder(dynamic id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: const Text('Deseja realmente excluir este pedido?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCELAR'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('EXCLUIR'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      await _apiService.deleteOrder(id);
-      _showMessage('Pedido excluído!', Colors.green);
-      _loadOrders();
-    } catch (e) {
-      _showMessage('Erro ao excluir: $e', Colors.red);
-    }
-  }
-
-  void _showMessage(String msg, Color color) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: color),
-    );
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 32),
-            SizedBox(width: 8),
-            Text('Sucesso!'),
-          ],
-        ),
-        content: const Text('Seu pedido foi enviado para a cozinha!'),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditDialog(Map<String, dynamic> order) {
-    String selectedStatus = order['status'] ?? 'ativo';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Editar Pedido'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Título: ${order['title']}'),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: selectedStatus,  // ✅ CORRIGIDO: value -> initialValue
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: const [
-                  DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
-                  DropdownMenuItem(value: 'preparando', child: Text('Preparando')),
-                  DropdownMenuItem(value: 'entregue', child: Text('Entregue')),
-                  DropdownMenuItem(value: 'cancelado', child: Text('Cancelado')),
-                ],
-                onChanged: (value) {
-                  setDialogState(() {
-                    selectedStatus = value ?? 'ativo';
-                  });
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCELAR'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _updateOrder(order['id'], selectedStatus);
-                Navigator.pop(context);
-              },
-              child: const Text('SALVAR'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Calcula o preço total multiplicando o preço unitário que veio por parâmetro pela quantidade
+    final double precoTotal = widget.price * quantidade;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pagamento'),
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
+        title: const Text('Meu Carrinho'),
+        backgroundColor: Colors.amber,
+        centerTitle: true,
       ),
-      body: Column(
-        children: [
-          _buildCurrentOrderCard(),
-          const Divider(height: 1),
-          Expanded(
-            child: _orders.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Nenhum pedido no histórico',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _orders.length,
-                    itemBuilder: (context, index) {
-                      final order = _orders[index];
-                      return _buildOrderCard(order);
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCurrentOrderCard() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      color: const Color(0xFF1A1A1A),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'RESUMO DO PEDIDO ATUAL',
-              style: TextStyle(
-                color: Colors.orange,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Itens Selecionados',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 12),
-            ...widget.cart.map((burger) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '• ${burger.name}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      Text(
-                        'R\$ ${burger.price.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                )),
-            const Divider(color: Colors.grey),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'TOTAL:',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  'R\$ ${widget.total.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _isProcessing ? null : _finalizePayment,
-                icon: _isProcessing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.name,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'R\$ ${widget.price.toStringAsFixed(2)} cada',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
                         ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: Colors.red),
+                            onPressed: () {
+                              if (quantidade > 1) {
+                                setState(() => quantidade--);
+                              }
+                            },
+                          ),
+                          Text(
+                            '$quantidade',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline,
+                                color: Colors.green),
+                            onPressed: () {
+                              setState(() => quantidade++);
+                            },
+                          ),
+                        ],
                       )
-                    : const Icon(Icons.check_circle),
-                label: Text(
-                  _isProcessing ? 'PROCESSANDO...' : 'CONFIRMAR PAGAMENTO',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ],
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+              ),
+              const SizedBox(height: 16),
+              // Card de Forma de Pagamento
+              Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Forma de Pagamento',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      RadioGroup<String>(
+                        groupValue: _metodoPagamento,
+                        onChanged: (value) =>
+                            setState(() => _metodoPagamento = value),
+                        child: Column(
+                          children: [
+                            RadioListTile<String>(
+                              title: const Text('Pix'),
+                              value: 'Pix',
+                              activeColor: Colors.amber,
+                              secondary: const Icon(Icons.pix),
+                            ),
+                            RadioListTile<String>(
+                              title: const Text('Cartão de Crédito'),
+                              value: 'Crédito',
+                              activeColor: Colors.amber,
+                              secondary: const Icon(Icons.credit_card),
+                            ),
+                            RadioListTile<String>(
+                              title: const Text('Cartão de Débito'),
+                              value: 'Débito',
+                              activeColor: Colors.amber,
+                              secondary: const Icon(Icons.credit_score),
+                            ),
+                            RadioListTile<String>(
+                              title: const Text('Dinheiro'),
+                              value: 'Dinheiro',
+                              activeColor: Colors.amber,
+                              secondary: const Icon(Icons.attach_money),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Card condicional com detalhes do método selecionado
+              if (_metodoPagamento != null) ...[
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 3,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final status = order['status'] ?? 'inativo';
-    final statusColor = _getStatusColor(status);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: statusColor,
-          child: const Icon(Icons.receipt, color: Colors.white, size: 20),
-        ),
-        title: Text(
-          order['title'] ?? 'Pedido sem título',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          order['description'] ?? 'Sem descrição',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Chip(
-              label: Text(
-                status.toUpperCase(),
-                style: const TextStyle(fontSize: 10, color: Colors.white),
-              ),
-              backgroundColor: statusColor,
-              padding: EdgeInsets.zero,
-            ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditDialog(order);
-                } else if (value == 'delete') {
-                  _deleteOrder(order['id']);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, color: Colors.orange, size: 20),
-                      SizedBox(width: 8),
-                      Text('Editar'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red, size: 20),
-                      SizedBox(width: 8),
-                      Text('Excluir'),
-                    ],
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: _buildPaymentContent(context),
                   ),
                 ),
               ],
-            ),
-          ],
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total do Pedido:',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'R\$ ${precoTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _enviando
+                      ? null
+                      : () async {
+                          if (_metodoPagamento == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                backgroundColor: Colors.red,
+                                content:
+                                    Text('Selecione uma forma de pagamento'),
+                              ),
+                            );
+                            return;
+                          }
+                          setState(() => _enviando = true);
+                          try {
+                            final orderData = {
+                              'title': widget.name,
+                              'description':
+                                  'Pedido de ${widget.name} x$quantidade via $_metodoPagamento',
+                              'status': 'ativo',
+                              'burgerId': widget.id,
+                              'quantity': quantidade,
+                              'paymentMethod': _metodoPagamento,
+                              'total': precoTotal,
+                              'createdAt': DateTime.now().toIso8601String(),
+                            };
+                            await _apiService.createOrder(orderData);
+                            await LocalStorageService.saveLocalOrder(orderData);
+                            if (!context.mounted) return;
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Pedido confirmado'),
+                                content: Text(
+                                  'Item: ${widget.name}\n'
+                                  'Quantidade: $quantidade\n'
+                                  'Forma de pagamento: $_metodoPagamento\n'
+                                  'Total: R\$ ${precoTotal.toStringAsFixed(2)}',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Pedido enviado com sucesso!'),
+                                        ),
+                                      );
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: Colors.red,
+                                content: Text('Erro ao enviar pedido: $e'),
+                              ),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _enviando = false);
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _enviando
+                      ? const CircularProgressIndicator(color: Colors.black)
+                      : const Text(
+                          'Finalizar Compra',
+                          style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'ativo':
-        return Colors.green;
-      case 'preparando':
-        return Colors.orange;
-      case 'entregue':
-        return Colors.blue;
-      case 'cancelado':
-        return Colors.red;
+  Widget _buildPaymentContent(BuildContext context) {
+    switch (_metodoPagamento) {
+      case 'Pix':
+        return _buildPixContent(context);
+      case 'Crédito':
+      case 'Débito':
+        return _buildCardContent();
+      case 'Dinheiro':
+        return _buildCashContent();
       default:
-        return Colors.grey;
+        return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildPixContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Pague com Pix',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 16),
+        QrImageView(
+          data: _pixCode,
+          size: 200,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const SelectableText(
+            _pixCode,
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: _pixCode));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Código copiado!')),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Copiar código'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Dados do Cartão',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _cardNumberController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Número do cartão',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _cardNameController,
+          decoration: const InputDecoration(
+            labelText: 'Nome impresso no cartão',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _cardExpiryController,
+                decoration: const InputDecoration(
+                  labelText: 'Validade (MM/AA)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _cardCvvController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'CVV',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Pagamento processado na entrega',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCashContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Pagamento em Dinheiro',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _trocoController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Precisa de troco para quanto? (opcional)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Pague na entrega ao motoboy',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+      ],
+    );
   }
 }

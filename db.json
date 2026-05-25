@@ -6,15 +6,17 @@
       "description": "Hambúrguer artesanal 180g, bacon crocante, queijo cheddar, alface e tomate",
       "price": 25.90,
       "category": "Tradicional",
-      "isAvailable": true
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400"
     },
     {
       "id": 2,
-      "name": "X-Salada",
-      "description": "Hambúrguer artesanal 180g, queijo mussarela, alface, tomate e cebola roxa",
-      "price": 22.90,
+      "name": "X-Salada Especial",
+      "description": "Hambúrguer artesanal 180g, queijo mussarela duplo, alface, tomate, cebola roxa e maionese da casa",
+      "price": 24.90,
       "category": "Tradicional",
-      "isAvailable": true
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=400"
     },
     {
       "id": 3,
@@ -22,7 +24,8 @@
       "description": "Hambúrguer artesanal 180g, bacon, ovo, queijo cheddar, presunto, alface e tomate",
       "price": 32.90,
       "category": "Especial",
-      "isAvailable": true
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=400"
     },
     {
       "id": 4,
@@ -30,7 +33,8 @@
       "description": "Hambúrguer artesanal 180g, ovo frito, queijo cheddar e maionese especial",
       "price": 24.90,
       "category": "Tradicional",
-      "isAvailable": true
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=400"
     },
     {
       "id": 5,
@@ -38,7 +42,17 @@
       "description": "Dois hambúrgueres 180g cada, bacon crocante, queijo cheddar duplo",
       "price": 38.90,
       "category": "Premium",
-      "isAvailable": true
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=400"
+    },
+    {
+      "id": 6,
+      "name": "X-Cheddar Supreme",
+      "description": "Hambúrguer artesanal 180g, muito molho cheddar cremoso e cebola caramelizada",
+      "price": 29.90,
+      "category": "Premium",
+      "isAvailable": true,
+      "imageUrl": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400"
     }
   ],
   "usuarios": [
@@ -49,17 +63,9 @@
       "senha": "123456",
       "phone": "(19) 99999-9999",
       "address": "Rua dos Hambúrgueres, 123"
-    },
-    {
-      "id": 2,
-      "name": "Cliente Teste",
-      "email": "cliente@teste.com",
-      "senha": "123456",
-      "phone": "(19) 98888-8888",
-      "address": "Av. Paulista, 1000"
     }
   ],
-  "telalocal": [
+   "telalocal": [
     {
       "id": 1,
       "title": "Pedido #001",
@@ -67,10 +73,20 @@
       "description": "Total: R$ 48.80 - Itens: X-Bacon, X-Salada",
       "total": 48.80,
       "items": [
-        {"id": 1, "name": "X-Bacon", "price": 25.90},
-        {"id": 2, "name": "X-Salada", "price": 22.90}
+        { "id": 1, "name": "X-Bacon", "price": 25.90 },
+        { "id": 2, "name": "X-Salada", "price": 22.90 }
       ],
       "createdAt": "2024-05-20T10:30:00Z"
+    }
+  ],
+  "excluidos": [
+    {
+      "id": 2,
+      "name": "Cliente Teste",
+      "email": "cliente@teste.com",
+      "senha": "123456",
+      "phone": "(19) 98888-8888",
+      "address": "Av. Paulista, 1000"
     }
   ]
 }

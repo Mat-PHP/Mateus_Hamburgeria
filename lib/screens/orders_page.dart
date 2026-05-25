@@ -38,6 +38,67 @@ class _OrdersPageState extends State<OrdersPage> {
     if (mounted) setState(() => _isLoading = false);
   }
 
+  Future<void> _deleteOrder(dynamic order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancelar pedido?'),
+        content: const Text('Tem certeza que deseja cancelar este pedido?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Não'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sim', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final id = order['id'];
+      await _apiService.deleteOrder(id is int ? id : int.parse(id.toString()));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido cancelado')),
+      );
+      _loadAllOrders();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Erro ao cancelar pedido: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateOrderPago(dynamic order) async {
+    try {
+      final id = order['id'];
+      final updateData = Map<String, dynamic>.from(order as Map);
+      updateData['status'] = 'pago';
+      await _apiService.updateOrder(
+          id is int ? id : int.parse(id.toString()), updateData);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido marcado como pago')),
+      );
+      _loadAllOrders();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Erro ao atualizar pedido: $e'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -88,13 +149,38 @@ class _OrdersPageState extends State<OrdersPage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _serverOrders.length,
-      itemBuilder: (context, index) {
-        final order = _serverOrders[index];
-        return _buildOrderTile(order, isLocal: false);
-      },
+    // Laço 'for' explícito para calcular o total geral dos pedidos
+    double totalGeral = 0;
+    for (var order in _serverOrders) {
+      totalGeral += (order['total'] as num? ?? 0).toDouble();
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: Colors.orange[50],
+          child: Text(
+            'Total geral: R\$ ${totalGeral.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.orange,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _serverOrders.length,
+            itemBuilder: (context, index) {
+              final order = _serverOrders[index];
+              return _buildOrderTile(order, isLocal: false);
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -161,13 +247,38 @@ class _OrdersPageState extends State<OrdersPage> {
                 Text('Data: ${_formatDate(createdAt)}'),
                 if (order['total'] != null)
                   Text(
-                    'Total: R\$ ${(order['total'] as double).toStringAsFixed(2)}',
+                    'Total: R\$ ${(order['total'] as num).toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.green,
                       fontSize: 18,
                     ),
                   ),
+                if (!isLocal) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.check_circle,
+                          color: status.toLowerCase() == 'pago'
+                              ? Colors.grey
+                              : Colors.green,
+                        ),
+                        tooltip: 'Marcar como pago',
+                        onPressed: status.toLowerCase() == 'pago'
+                            ? null
+                            : () => _updateOrderPago(order),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        tooltip: 'Cancelar pedido',
+                        onPressed: () => _deleteOrder(order),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
