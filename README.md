@@ -10,7 +10,7 @@
 npm install -g json-server
 
 # Inicie o servidor
-json-server --watch db.json --host 10.109.72.17 --port 30
+json-server --watch db.json --host 10.109.72.17 --port 300
 ```
 
 ### 2. App Flutter
